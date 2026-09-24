@@ -8,24 +8,50 @@ import re
 
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 
-ENTITIES = ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN", "EMPLOYEE_ID"]
-NEVER_RESTORE = {"US_SSN"}  # these stay hidden even in the final answer
+ENTITIES = [
+    "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN",
+    "EMPLOYEE_ID", "DATE_OF_BIRTH", "US_STREET_ADDRESS",
+]
+# High-sensitivity identifiers stay hidden even in the final answer shown to the user.
+NEVER_RESTORE = {"US_SSN", "DATE_OF_BIRTH", "US_STREET_ADDRESS"}
 SCORE_THRESHOLD = 0.35
+
+_MONTH = "(?:January|February|March|April|May|June|July|August|September|October|November|December)"
+_DATE = rf"(?:{_MONTH} +\d{{1,2}}, +\d{{4}}|\d{{1,2}}/\d{{1,2}}/\d{{2,4}}|\d{{4}}-\d{{2}}-\d{{2}})"
+_STREET_SUFFIX = (
+    "Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Court|Ct|Way|Place|Pl"
+)
+
+# (entity, regex, score). Case-sensitive on purpose, so ordinary lowercase text can't match.
+CUSTOM_RECOGNIZERS = [
+    ("EMPLOYEE_ID", r"\bEMP-\d{5}\b", 0.9),
+    # Only a date directly after "date of birth" / "DOB" / "born", so ordinary dates survive.
+    ("DATE_OF_BIRTH", rf"\b(?i:date of birth|dob|born(?: on)?)[:,]? +{_DATE}", 0.85),
+    # Street address, plus optional ", City, ST 12345" so the whole address is one span.
+    (
+        "US_STREET_ADDRESS",
+        rf"\b\d{{1,6}} +(?:[A-Z][A-Za-z0-9.'-]* +){{1,3}}(?:{_STREET_SUFFIX})\b\.?"
+        r"(?:, +[A-Z][A-Za-z.]*(?: +[A-Z][A-Za-z.]*)*, +[A-Z]{2} +\d{5}(?:-\d{4})?)?",
+        0.85,
+    ),
+]
 
 _analyzer = None
 
 
 def _get_analyzer():
-    """Load Presidio lazily (the spaCy model takes a few seconds) and add a custom recognizer."""
+    """Load Presidio lazily (the spaCy model takes a few seconds) and add custom recognizers."""
     global _analyzer
     if _analyzer is None:
         _analyzer = AnalyzerEngine()
-        _analyzer.registry.add_recognizer(
-            PatternRecognizer(
-                supported_entity="EMPLOYEE_ID",
-                patterns=[Pattern("employee_id", r"\bEMP-\d{5}\b", 0.9)],
+        for entity, regex, score in CUSTOM_RECOGNIZERS:
+            _analyzer.registry.add_recognizer(
+                PatternRecognizer(
+                    supported_entity=entity,
+                    patterns=[Pattern(entity.lower(), regex, score)],
+                    global_regex_flags=re.MULTILINE,
+                )
             )
-        )
     return _analyzer
 
 
