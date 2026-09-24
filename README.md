@@ -182,8 +182,10 @@ Try asking "What is the Q3 operating budget?" as `alice`, then as `fiona`. The
   address/date-of-birth recognizers) came from failures on this same set, and I wrote both the
   documents and the questions. The 100% figures should not be read as general accuracy.
 - **LLM judge.** Answer correctness and access-control results are graded by a model and inherit
-  its mistakes. Model answers are not seeded, so runs can differ by a question or so; the payload
-  metric depends only on retrieval and redaction and is deterministic.
+  its mistakes. I hand-checked a random sample of 10 judge verdicts from the final run (8
+  answerable, 2 access-control) and agreed with all 10; the sample was small and included no
+  unanswerable questions. Model answers are not seeded, so runs can differ by a question or so;
+  the payload metric depends only on retrieval and redaction and is deterministic.
 - **Redaction coverage is limited to what I planted and tested.** Names depend on spaCy's
   judgment; the address recognizer needs a US-style street suffix; dates of birth are caught only
   after words like "date of birth" or "DOB"; other identifiers (passport numbers, bank accounts,
