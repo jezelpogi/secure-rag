@@ -1,7 +1,7 @@
 import json
 from types import SimpleNamespace
 
-import naive_rag as n
+import pipeline as n
 from security.pii import Redactor
 
 TEXT = (
@@ -46,14 +46,6 @@ def test_outgoing_api_payload_contains_no_pii(monkeypatch):
     assert "512-44-8291" not in payload
     assert "Maria Santos" not in payload
 
-def test_possessive_does_not_create_a_second_placeholder():
-    r = Redactor()
-    a = r.redact("Who approved Priya Raman's reimbursement?")
-    b = r.redact("Priya Raman submitted the request.")
-    assert "<PERSON_1>'s reimbursement" in a
-    assert "<PERSON_1>" in b
-    assert "<PERSON_2>" not in a + b
-    assert r.restore(a) == "Who approved Priya Raman's reimbursement?"
 
 def test_possessive_does_not_create_a_second_placeholder():
     r = Redactor()

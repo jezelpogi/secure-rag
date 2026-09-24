@@ -1,7 +1,7 @@
 import json
 from types import SimpleNamespace
 
-import naive_rag as n
+import pipeline as n
 from security.pii import Redactor
 
 TEXT = (

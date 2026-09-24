@@ -1,0 +1,9 @@
+anthropic
+chromadb
+sentence-transformers
+python-dotenv
+presidio-analyzer
+spacy
+streamlit
+pyjwt
+pytest

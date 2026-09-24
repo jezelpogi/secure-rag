@@ -1,6 +1,7 @@
 import pytest
 
-import naive_rag as n
+from retrieval.search import retrieve
+from settings import ROLE_ACCESS
 
 QUESTIONS = [
     "What is the Q3 fuel budget?",
@@ -11,14 +12,14 @@ QUESTIONS = [
 ]
 
 
-@pytest.mark.parametrize("role", list(n.ROLE_ACCESS))
+@pytest.mark.parametrize("role", list(ROLE_ACCESS))
 def test_only_allowed_departments_retrieved(role):
-    allowed = set(n.ROLE_ACCESS[role])
+    allowed = set(ROLE_ACCESS[role])
     for q in QUESTIONS:
-        _, metas = n.retrieve(q, k=10, user_role=role)
+        _, metas = retrieve(q, k=10, user_role=role)
         assert {m["department"] for m in metas} <= allowed
 
 
 def test_unknown_role_is_rejected():
     with pytest.raises(ValueError):
-        n.retrieve("anything", user_role="intern")
+        retrieve("anything", user_role="intern")
