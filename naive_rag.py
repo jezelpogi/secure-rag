@@ -4,10 +4,14 @@ import re
 import sys
 from pathlib import Path
 
+import json
+from datetime import datetime, timezone
+
 import anthropic
 import chromadb
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
+
 
 load_dotenv()
 
@@ -15,6 +19,14 @@ DOCS_DIR = Path("data/docs")
 DB_DIR = "chroma_db"
 MODEL = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")  # set LLM_MODEL in .env to change
 K = 5
+ROLE_ACCESS = {
+       "employee": ["public"],
+       "hr": ["public", "hr"],
+       "finance": ["public", "finance"],
+       "engineering": ["public", "engineering"],
+       "admin": ["public", "hr", "finance", "engineering"],
+   }
+AUDIT_LOG = Path("logs/audit.jsonl")
 
 SYSTEM = (
     "Answer using only the numbered sources provided. "
@@ -73,10 +85,32 @@ def build_index():
     print(f"Indexed {len(texts)} chunks from {len({m['doc_id'] for m in metas})} documents.")
 
 
-def ask(question, k=K):
-    q_emb = embedder.encode([question], normalize_embeddings=True).tolist()
-    res = collection.query(query_embeddings=q_emb, n_results=k)
-    chunks, metas = res["documents"][0], res["metadatas"][0]
+def retrieve(question, k=K, user_role=None):
+       """Top-k chunks. With a user_role, the search is limited to departments that role may see."""
+       where = None
+       if user_role is not None:
+           if user_role not in ROLE_ACCESS:
+               raise ValueError(f"Unknown role: {user_role}")
+           where = {"department": {"$in": ROLE_ACCESS[user_role]}}
+       q_emb = embedder.encode([question], normalize_embeddings=True).tolist()
+       res = collection.query(query_embeddings=q_emb, n_results=k, where=where)
+       return res["documents"][0], res["metadatas"][0]
+
+
+def audit(user_role, question, metas):
+       AUDIT_LOG.parent.mkdir(exist_ok=True)
+       entry = {
+           "ts": datetime.now(timezone.utc).isoformat(),
+           "role": user_role,
+           "question": question,
+           "retrieved": [m["doc_id"] for m in metas],
+       }
+       with AUDIT_LOG.open("a", encoding="utf-8") as f:
+           f.write(json.dumps(entry) + "\n")
+
+def ask(question, k=K, user_role=None):
+       chunks, metas = retrieve(question, k, user_role)
+       audit(user_role, question, metas)
 
     context = "\n\n".join(
         f"[{i}] ({m['title']})\n{c}" for i, (c, m) in enumerate(zip(chunks, metas), 1)
